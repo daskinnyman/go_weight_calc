@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"weight-tracker/pkg/api"
-	"weight-tracker/pkg/app"
+	"weight-tracker/pkg/handlers"
 	"weight-tracker/pkg/repository"
 
 	"github.com/gin-contrib/cors"
@@ -19,14 +19,6 @@ func main() {
 	}
 }
 
-const (
-	// 指定要連接的DB位置
-	// HOST     = "postgresql://localhost:5432"
-	DATABASE = "postgres"
-	USER     = "postgres"
-	PASSWORD = "example"
-)
-
 func run() error {
 	connectionString := "postgres://postgres:example@127.0.0.1:5432/postgres?sslmode=disable"
 	db, err := setupDatabase(connectionString)
@@ -38,7 +30,7 @@ func run() error {
 	storage := repository.NewStorage(db)
 
 	err = storage.RunMigrations("postgres://postgres:example@127.0.0.1:5432/postgres?sslmode=disable")
-	fmt.Println(err)
+
 	if err != nil {
 		return err
 	}
@@ -46,14 +38,17 @@ func run() error {
 	router := gin.Default()
 	router.Use(cors.Default())
 
+	// Inject repo into services
 	userService := api.NewUserService(storage)
 	weightService := api.NewWeightService(storage)
 
-	server := app.NewServer(router, userService, weightService)
+	// Inject services into routes
+	handlers.NewUserHanlder(router, userService)
+	handlers.NewWeightHandler(router, weightService)
 
-	err = server.Run()
-
+	err = router.Run(":5001")
 	if err != nil {
+		fmt.Printf("Server - there was an error calling Run on router: %v", err)
 		return err
 	}
 
